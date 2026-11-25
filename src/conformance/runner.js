@@ -175,7 +175,8 @@ function fixtureConfig(fixture, mockServer, origin) {
   return {
     fixtureId: fixture.id,
     mockOrigin: mockServer ? mockServer.origin : '',
-    assetBase: `${origin}/assets/${fixture.id}`,
+    // the static server serves fixture files under /fixtures/<id>/ (resolveStatic)
+    assetBase: `${origin}/fixtures/${fixture.id}`,
     preloadUrl: needsPreload(fixture.meta) ? '/preload/three.min.js' : null,
     settle: SETTLE_AFTER_BOOT_MS,
   };
@@ -288,7 +289,7 @@ function serveStatic({ bundlePath, threePath, fixturesDir }) {
 }
 
 // one route lookup: {body, type} or null for 404
-function resolveStatic(server, url, { bundlePath, threePath, fixturesDir }) {
+export function resolveStatic(server, url, { bundlePath, threePath, fixturesDir }) {
   if (url.pathname === '/') {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const fixtureId = url.searchParams.get('fixture') ?? 'hello';
@@ -296,7 +297,7 @@ function resolveStatic(server, url, { bundlePath, threePath, fixturesDir }) {
       body: pageHtml({
         fixtureId,
         mockOrigin: url.searchParams.get('mockOrigin') ?? '',
-        assetBase: url.searchParams.get('assetBase') ?? `${origin}/assets/${fixtureId}`,
+        assetBase: url.searchParams.get('assetBase') ?? `${origin}/fixtures/${fixtureId}`,
         preloadUrl: url.searchParams.get('preloadUrl') || null,
         settle: Number(url.searchParams.get('settle') ?? SETTLE_AFTER_BOOT_MS),
       }),

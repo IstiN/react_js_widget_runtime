@@ -11,6 +11,8 @@ import { readFileSync } from 'node:fs';
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 
+import { MAPPED_TYPES, SPECS } from '../src/dom/mapping.js';
+
 test('docs/node-support.json covers every registered type with the registry status', () => {
   const support = JSON.parse(readFileSync(join(root, 'docs', 'node-support.json'), 'utf8'));
   const nodes = support.nodes;
@@ -19,6 +21,14 @@ test('docs/node-support.json covers every registered type with the registry stat
   assert.deepEqual(nodes.chart, { status: 'partial', reason: 'host contract' });
   assert.equal(nodes.absoluteFill.status, 'partial');
   assert.equal(nodes.absoluteFill.reason, 'fallback');
+});
+
+test('every mapped type carries a SPECS entry (doc rows cannot disagree with the code)', () => {
+  for (const type of MAPPED_TYPES) {
+    const spec = SPECS[type];
+    assert.ok(spec, `SPECS.${type} missing`);
+    assert.ok(spec.dom && spec.css, `SPECS.${type} needs dom + css`);
+  }
 });
 
 test('generated docs are in sync with the mapping registry (drift check)', () => {

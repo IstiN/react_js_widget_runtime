@@ -14,13 +14,20 @@ runs in a Web Worker and is rendered into the DOM with React. Part of the
   frames and the host services, and the interface is the engine adapter of
   `IstiN/js_runtime/docs/ENGINE_ADAPTER.md`.
 - **DOM mapping** (`src/dom/mapping.js`): normalized node tree to React
-  elements. Implemented node types: the Android POC set (`center`, `column`,
-  `row`, `text`, `textButton`/`button`, `textField`, `sizedBox`, `padding`,
-  `container`, `card`, `scroll`, `listView`, `divider`, `spacer`) plus
-  `image`, `icon`, `video`, `audio`; every other registered type renders the
-  fallback card with its node id tag. Effect props (blur, clip, boxShadows,
-  gradients, rotateX/rotateY/perspective, textShadow, textTransform,
-  offsetX/offsetY, scale, rotation, opacity) map to CSS natively.
+  elements; React reconciles by the widget `key` prop (collected from the
+  raw payload before normalization), falling back to the stable `nodeId`.
+  Every mapped element carries `data-node-id="n<i>"` and
+  `data-node-type="<type>"`. Implemented: the Android POC set, the button
+  family, inputs (`textField`/`textArea`/`searchBar`), the navigation family
+  (`tabBar`, `navigationBar`, `navigationRail`, `segmentedButton`),
+  `gestureDetector`, `listTile`, `dropdown`, plus `image`, `icon`, `divider`,
+  `spacer`, `video`, `audio`; every other registered type renders the
+  fallback card with its node id tag. The per-type mapping (DOM structure,
+  attributes, CSS, events, status) is `docs/dom-mapping.md`, generated from
+  the registry (`SPECS`); support rows are `docs/node-support.json`. Effect
+  props (blur, clip, boxShadows, gradients, rotateX/rotateY/perspective,
+  textShadow, textTransform, offsetX/offsetY, scale, rotation, opacity) map
+  to CSS natively.
 - **Host services** (`src/host/hostServices.js`): `fetch` (mock origin),
   `localStorage`, in-memory secrets, `loadAsset` by fetch, `openUrl` by
   `window.open`, `exec` resolves the documented named error.
@@ -46,6 +53,18 @@ npm install
 npm test          # unit tests (node --test)
 npm run build     # esbuild bundle -> dist/jsr-widget.js
 npm run proof     # Playwright browser proof (needs `npx playwright install chromium`)
+
+# Conformance (plan 1.4): run every kit fixture in Chromium, then compare
+# against the kit expectations with the kit harness
+bash scripts/fetch-conformance.sh
+npm run build
+node tool/conformance.mjs --fixtures .conformance/js_widget_runtime/docs/conformance/fixtures --out out/conformance
+node .conformance/js_widget_runtime/harness/harness.mjs compare \
+  --fixtures .conformance/js_widget_runtime/docs/conformance/fixtures \
+  --results out/conformance --out-report conformance-report.md
+
+# Regenerate the mapping docs when src/dom/mapping.js changes
+node tool/gen-support-docs.mjs   # --check fails on drift (also in npm test)
 ```
 
 ## Quality gate

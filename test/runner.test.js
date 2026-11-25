@@ -3,7 +3,9 @@
 // the driver with a fake IO.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assembleResult, filterFixtureIds, needsMock, needsPreload, resultTrace } from '../src/conformance/runner.js';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { assembleResult, filterFixtureIds, needsMock, needsPreload, resolveStatic, resultTrace } from '../src/conformance/runner.js';
 import { applyActions, createDomInteractionDriver } from '../src/dom/DomInteractionDriver.js';
 
 test('resultTrace drops the worker-internal event_done verb', () => {
@@ -30,6 +32,23 @@ test('needsMock / needsPreload follow meta.json', () => {
   assert.equal(needsPreload({ capabilities: ['three'] }), true);
   assert.equal(needsPreload({ capabilities: [] }), false);
   assert.equal(needsPreload({}), false);
+});
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const fakeServer = { address: () => ({ port: 1 }) };
+const staticPaths = {
+  bundlePath: 'b',
+  threePath: 't',
+  fixturesDir: join(root, '.conformance', 'js_widget_runtime', 'docs', 'conformance', 'fixtures'),
+};
+const route = (path) => resolveStatic(fakeServer, new URL(path, 'http://local'), staticPaths);
+
+test('assetBase route serves fixture files; the old /assets prefix 404s', () => {
+  // loadAsset fetches `${assetBase}/${path}` — the base must point at a
+  // served route or every asset resolves null (l2_load_asset regression).
+  assert.equal(route('/fixtures/l2_load_asset/data.txt')?.type, 'text/plain');
+  assert.equal(route('/assets/l2_load_asset/data.txt'), null);
+  assert.match(String(route('/?fixture=l2_load_asset').body), /\/fixtures\/l2_load_asset/);
 });
 
 test('assembleResult mirrors the kit result shape', () => {

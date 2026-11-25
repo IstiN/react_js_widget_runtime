@@ -491,3 +491,67 @@ function fallbackCard(node, onAction) {
 }
 
 export const MAPPED_TYPES = Object.keys(MAPPERS);
+
+// Mapping spec — one entry per mapped type, rendered into docs/dom-mapping.md
+// rows by tool/gen-support-docs.mjs (one source of truth: this file). Kept
+// next to the mappers so a mapper change and its doc row land in one diff;
+// test/nodeSupport.test.js fails when a mapped type lacks a spec.
+// Every row also gets: data-node-id/data-node-type, the React `key`
+// (widget key ?? nodeId), and the universal effect props → CSS (opacity,
+// blur→filter, clip→overflow, perspective/rotateX/rotateY/offsetX/offsetY/
+// scale/rotation→transform) plus the box props (width/height/padding/
+// margin/borderRadius/spacing→gap, decoration color/shadows/gradient→
+// background/box-shadow).
+const FLEX_CSS = 'display:flex; spacing→gap; mainAxisAlignment→justify-content; crossAxisAlignment→align-items; box props';
+const BOX = { css: 'box props' };
+const TAP = 'onTap ?? onPressed ?? onClick ?? onPress → click {}';
+const BUTTON_SPEC = { dom: '<button> (label: data ?? text ?? children)', attrs: ['type=button'], css: 'box props', events: [TAP] };
+const INPUT_SPEC = (dom) => ({ dom, attrs: ['placeholder = hint', 'defaultValue = initialValue'], css: 'box props', events: ['onChanged ?? onChange → input {value}', 'onSubmit ?? onSubmitted → Enter {value}'] });
+const SELECT_SPEC = (dom, value) => ({ dom, css: 'flex row; gap 24px; padding 8px; box props', events: [`onChange ?? onChanged ?? onSelected → label click {value: ${value}}`] });
+
+export const SPECS = {
+  center: { dom: '<div> flex center', css: 'display:flex; align-items:center; justify-content:center; box props' },
+  column: { dom: '<div> flex column', css: FLEX_CSS.replace('spacing', 'flex-direction:column; spacing') },
+  row: { dom: '<div> flex row', css: FLEX_CSS.replace('spacing', 'flex-direction:row; spacing') },
+  text: { dom: '<span> text child (data, textTransform applied)', css: 'white-space:pre-wrap; fontSize→font-size; color→color; fontWeight→font-weight; textAlign→text-align; textShadow(s)→text-shadow; box props' },
+  scroll: { dom: '<div> scroll container', css: 'overflow-y:auto; box props' },
+  listView: { dom: '<div> flex column scroll', css: 'display:flex; flex-direction:column; spacing→gap; overflow-y:auto; box props' },
+  padding: { dom: '<div> padded box', css: 'box-sizing:border-box; padding→padding; box props' },
+  container: { dom: '<div> box', ...BOX },
+  card: { dom: '<div> elevated card', css: 'default radius 12px + shadow 0 2px 4px rgba(0,0,0,.3); flex column; box props' },
+  sizedBox: { dom: '<div> fixed box', css: 'width/height→width/height; box props' },
+  spacer: { dom: '<div> flexible gap', css: 'flex:1 1 0%; box props' },
+  divider: { dom: '<div> 1px rule', css: 'height:1px; background:rgba(136,136,136,.2); box props' },
+  image: { dom: '<img>', attrs: ['src = url ?? src', 'alt = data'], css: 'box props' },
+  icon: { dom: '<div> glyph child (data ?? name)', css: 'color→color; box props' },
+  video: { dom: '<video controls>', attrs: ['src = url ?? src', 'controls'], css: 'box props' },
+  audio: { dom: '<audio controls>', attrs: ['src = url ?? src', 'controls'], css: 'box props' },
+  textField: INPUT_SPEC('<input>'),
+  textArea: INPUT_SPEC('<textarea>'),
+  searchBar: INPUT_SPEC('<input>'),
+  tabBar: {
+    dom: '<div> tab labels (clickable spans, selected bold)',
+    css: 'flex row; gap 16px; padding 8px; box props',
+    events: ['onChange ?? onChanged ?? onSelected → tab click {value: index}'],
+    notes: 'live `data` is the selected label (dump)',
+  },
+  gestureDetector: { dom: '<div> hit area', css: 'box props', events: [TAP, 'onScroll → wheel {dx, dy}'] },
+  listTile: { dom: '<div> flex row center', css: 'display:flex; align-items:center; gap 12px; padding 12px; box props', events: ['onTap ?? onPress → click {}'] },
+  dropdown: {
+    dom: '<div> relative wrapper + button (value) + option spans (menu is uncontrolled DOM)',
+    css: 'position:relative; box props',
+    events: ['onChange ?? onChanged ?? onTap → option click {value: option}'],
+  },
+  navigationBar: SELECT_SPEC('<div> destination labels (clickable)', 'index'),
+  navigationRail: SELECT_SPEC('<div> destination labels (clickable)', 'index'),
+  segmentedButton: SELECT_SPEC('<div> segment labels (clickable)', 'label'),
+  map: {
+    dom: '<div> stub surface + marker labels',
+    css: 'position:relative; background:#dbeafe; box props',
+    events: ['onTap → surface click {lat: 0, lng: 0}', 'onMarkerTap → marker click {id}'],
+  },
+  textButton: BUTTON_SPEC,
+  button: BUTTON_SPEC,
+  outlinedButton: BUTTON_SPEC,
+  iconButton: BUTTON_SPEC,
+};
