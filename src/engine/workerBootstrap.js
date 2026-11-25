@@ -92,6 +92,7 @@ function json(value) {
  * @param {object} [opts.theme] initial theme merged into jsr.theme
  * @param {string} [opts.mockOrigin] origin injected as `__JSR_MOCK_ORIGIN__`
  * @param {string} [opts.hostBootstrapJs] optional code between the halves and the widget
+ * @param {string} [opts.preloadSource] library preload between __IID and the halves (three.min.js)
  * @returns {string} the worker script
  */
 export function buildWorkerScript(opts) {
@@ -99,6 +100,7 @@ export function buildWorkerScript(opts) {
   const theme = opts.theme ?? {};
   const mockOrigin = opts.mockOrigin ?? '';
   const hostBootstrapJs = opts.hostBootstrapJs ?? '';
+  const preloadSource = opts.preloadSource ?? '';
   return `
 ${TRANSPORT}
 var __IID = ${json(iid)};
@@ -107,6 +109,7 @@ function sendMessage(channel, jsonString) {
   __jsrPost('__jsr__' + JSON.stringify({channel: channel, payload: jsonString}));
 }
 ${DISPATCH}
+${preloadSource}
 ${runtimeSource}
 ${widgetSource}
 jsr.theme = Object.assign(jsr.theme || {}, ${json(theme)});

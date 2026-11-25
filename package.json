@@ -10,7 +10,8 @@
     "coverage": "npx c8 --reporter=json --reporter=text --include='src/**' node --test \"test/*.test.js\"",
     "crap": "npx crap4js src --coverage coverage/coverage-final.json --threshold 8.0 --exclude 'src/vendor/**'",
     "build": "node esbuild.config.mjs",
-    "proof": "node tool/browser-proof.mjs"
+    "proof": "node tool/browser-proof.mjs",
+    "conformance": "node tool/conformance.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",

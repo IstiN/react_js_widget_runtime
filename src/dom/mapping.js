@@ -12,7 +12,11 @@ const TAGS = {
   text: 'span',
   textButton: 'button',
   button: 'button',
+  outlinedButton: 'button',
+  iconButton: 'button',
   textField: 'input',
+  textArea: 'textarea',
+  searchBar: 'input',
   image: 'img',
   video: 'video',
   audio: 'audio',
@@ -41,28 +45,43 @@ function rawChildrenOf(node) {
  * @param {object} [opts]
  * @param {function} [opts.onAction] (actionId, payload) for taps and inputs
  * @returns {{ element: object, tree: object, record: Map }} React element,
- *   normalized tree, and the applied-node record keyed by nodeId (dumpViewTree).
+ *   normalized tree, and the applied-node record keyed by nodeId: the raw
+ *   (verbatim) props the renderer applied plus the normalized node for
+ *   type/events/children — the reference dump keeps payload props verbatim.
  */
 export function renderJsrTree(payload, opts = {}) {
   const raw = typeof payload === 'string' ? JSON.parse(payload) : payload;
   const keys = collectKeys(raw);
+  const rawByPath = new Map();
+  collectRaw(raw, '0', rawByPath);
   const tree = normalizeTree(raw);
   const record = new Map();
-  const element = buildElement(tree, '0', keys, record, opts.onAction ?? null);
+  const element = buildElement(tree, '0', keys, rawByPath, record, opts.onAction ?? null);
   return { element, tree, record };
 }
 
-function buildElement(node, path, keys, record, onAction) {
-  record.set(node.nodeId, node);
-  const children = node.children.map((child, i) => buildElement(child, `${path}.${i}`, keys, record, onAction));
+// The raw tree and the normalized tree share the child index order
+// (child/children/items all normalize to children), so a parallel walk by
+// child index path pairs every normalized node with its raw props.
+function collectRaw(node, path, map) {
+  if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+  map.set(path, node);
+  rawChildrenOf(node).forEach((child, i) => collectRaw(child, `${path}.${i}`, map));
+}
+
+function buildElement(node, path, keys, rawByPath, record, onAction) {
+  record.set(node.nodeId, { node, raw: rawByPath.get(path) ?? null });
+  const children = node.children.map((child, i) => buildElement(child, `${path}.${i}`, keys, rawByPath, record, onAction));
   const mapper = MAPPERS[node.type] ?? null;
-  const props = {
+  const built = (mapper ?? fallbackCard)(node, onAction) ?? {};
+  const { __kids, ...props } = built;
+  const own = childrenOf(node, children, mapper === null);
+  return createElement(TAGS[node.type] ?? 'div', {
     key: keys.get(path) ?? node.nodeId,
     'data-node-id': node.nodeId,
     'data-node-type': node.type,
-    ...(mapper ?? fallbackCard)(node, onAction),
-  };
-  return createElement(TAGS[node.type] ?? 'div', props, childrenOf(node, children, mapper === null));
+    ...props,
+  }, own ?? __kids);
 }
 
 // Text nodes render their `data` as the child string; the reference
@@ -79,7 +98,7 @@ function labelChildren(node, children) {
   return [String(node.props.data ?? node.props.text ?? '')];
 }
 
-const LABEL_TYPES = new Set(['textButton', 'button']);
+const LABEL_TYPES = new Set(['textButton', 'button', 'outlinedButton', 'iconButton']);
 
 function childrenOf(node, children, isFallback) {
   if (node.type === 'text') return [textOf(node)];
@@ -252,25 +271,70 @@ const MAPPERS = {
     ...wiredInput(node, onAction),
     style: boxCss(node),
   }),
+  textArea: (node, onAction) => ({
+    placeholder: node.props.hint ?? '',
+    defaultValue: node.props.initialValue ?? '',
+    ...wiredInput(node, onAction),
+    style: boxCss(node),
+  }),
+  searchBar: (node, onAction) => ({
+    placeholder: node.props.hint ?? '',
+    defaultValue: node.props.initialValue ?? '',
+    ...wiredInput(node, onAction),
+    style: boxCss(node),
+  }),
+  tabBar: tabBarView,
   textButton: (node, onAction) => ({
     type: 'button',
     ...wiredButton(node, onAction),
     style: boxCss(node),
   }),
+  // Interactive composite nodes: the interactive sub-elements (destinations,
+  // markers, menu options) carry NO data-node-id — the AUI dump keeps only
+  // the node element itself (plan 1.3 dump source).
+  gestureDetector: (node, onAction) => ({
+    onWheel: wheelWiring(node, onAction),
+    ...wiredButton(node, onAction),
+    style: boxCss(node),
+  }),
+  listTile: (node, onAction) => ({
+    ...pressWiring(node, onAction),
+    style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', ...boxCss(node) },
+  }),
+  dropdown: (node, onAction) => ({
+    __kids: [createElement(DropdownWidget, { key: 'dd', node, onAction })],
+    style: { position: 'relative', ...boxCss(node) },
+  }),
+  navigationBar: destinationsView,
+  navigationRail: destinationsView,
+  segmentedButton: destinationsView,
+  map: (node, onAction) => ({
+    style: { position: 'relative', background: '#dbeafe', ...boxCss(node) },
+    __kids: mapKids(node, onAction),
+  }),
 };
 
 MAPPERS.button = MAPPERS.textButton;
+MAPPERS.outlinedButton = MAPPERS.textButton;
+MAPPERS.iconButton = MAPPERS.textButton;
 
 // POC buttons carry `onTap`/`onPressed` string action ids (the native
-// renderer reads both); inputs carry `onChanged`/`onChange`.
+// renderer reads both, plus onPress on list tiles); inputs carry
+// `onChanged`/`onChange`.
 function tapActionOf(node) {
   const e = node.events ?? {};
-  return e.onTap ?? e.onPressed ?? e.onClick ?? null;
+  return e.onTap ?? e.onPressed ?? e.onClick ?? e.onPress ?? null;
 }
 
 function changeActionOf(node) {
   const e = node.events ?? {};
   return e.onChanged ?? e.onChange ?? null;
+}
+
+// A1: keyboard done on a text node dispatches onSubmit / onSubmitted.
+function submitActionOf(node) {
+  const e = node.events ?? {};
+  return e.onSubmit ?? e.onSubmitted ?? null;
 }
 
 function wiredButton(node, onAction) {
@@ -281,13 +345,140 @@ function wiredButton(node, onAction) {
 
 function wiredInput(node, onAction) {
   const action = changeActionOf(node);
+  const submit = submitActionOf(node);
+  const wiring = {};
+  if (onAction && action) wiring.onChange = (e) => onAction(action, { value: e.target.value });
+  if (onAction && submit) {
+    wiring.onKeyDown = (e) => {
+      if (e.key === 'Enter') onAction(submit, { value: e.target.value });
+    };
+  }
+  return wiring;
+}
+
+// A2: pointer scroll on a gestureDetector delivers onScroll with the wheel
+// deltas; the payload shape follows the reference event contract.
+function wheelWiring(node, onAction) {
+  const e = node.events ?? {};
+  const action = e.onScroll ?? null;
+  if (!onAction || !action) return undefined;
+  return (ev) => onAction(action, { dx: ev.deltaX, dy: ev.deltaY });
+}
+
+// listTile priority: onPress when onTap is not set (reference semantics).
+function pressWiring(node, onAction) {
+  const e = node.events ?? {};
+  const action = e.onTap ?? e.onPress ?? null;
   if (!onAction || !action) return {};
-  return { onChange: (e) => onAction(action, { value: e.target.value }) };
+  return { onClick: () => onAction(action, {}) };
+}
+
+// navigationBar / navigationRail / segmentedButton: destinations or segments
+// render as clickable labels; the event priority is
+// onChange ?? onChanged ?? onSelected. Destinations deliver {value: index};
+// string segments deliver {value: label}.
+function destinationsView(node, onAction) {
+  const items = node.props.destinations ?? node.props.segments ?? [];
+  const action = selectedActionOf(node);
+  const numeric = Array.isArray(node.props.destinations);
+  const style = { display: 'flex', gap: '24px', padding: '8px', ...boxCss(node) };
+  return {
+    style,
+    __kids: items.map((item, i) => createElement('span', {
+      key: `${labelOf(item)}-${i}`,
+      onClick: onAction && action ? () => onAction(action, { value: numeric ? i : labelOf(item) }) : undefined,
+      style: ITEM_STYLE,
+    }, labelOf(item))),
+  };
+}
+
+function selectedActionOf(node) {
+  const e = node.events ?? {};
+  return e.onChange ?? e.onChanged ?? e.onSelected ?? null;
+}
+
+function labelOf(item) {
+  return typeof item === 'string' ? item : String(item?.label ?? '');
+}
+
+const ITEM_STYLE = { cursor: 'pointer', padding: '4px 8px' };
+
+// map: the surface delivers onTap {lat, lng} (origin for the stub surface);
+// markers render as labeled spans and deliver onMarkerTap {id}.
+function mapKids(node, onAction) {
+  const e = node.events ?? {};
+  const kids = [];
+  if (onAction && e.onTap) {
+    kids.push(createElement('span', {
+      key: 'surface',
+      onClick: () => onAction(e.onTap, { lat: 0, lng: 0 }),
+      style: { position: 'absolute', inset: 0 },
+    }));
+  }
+  for (const marker of node.props.markers ?? []) {
+    kids.push(createElement('span', {
+      key: `marker-${marker.id ?? marker.label}`,
+      onClick: onAction && e.onMarkerTap ? () => onAction(e.onMarkerTap, { id: marker.id }) : undefined,
+      style: { position: 'absolute', left: '40%', top: '40%', cursor: 'pointer', background: '#fff', borderRadius: '4px', padding: '2px 6px', fontSize: '11px' },
+    }, marker.label ?? marker.id));
+  }
+  return kids;
+}
+
+// tabBar: tab labels render as clickable spans (no node ids — the dump
+// keeps the bar as one node); the bar's live `data` is the selected label.
+function tabBarView(node, onAction) {
+  const tabs = node.props.tabs ?? [];
+  const action = selectedActionOf(node);
+  const selected = typeof node.props.selectedIndex === 'number' ? node.props.selectedIndex : 0;
+  return {
+    style: { display: 'flex', gap: '16px', padding: '8px', ...boxCss(node) },
+    __kids: tabs.map((tab, i) => createElement('span', {
+      key: `tab-${i}`,
+      onClick: onAction && action ? () => onAction(action, { value: i }) : undefined,
+      style: { ...ITEM_STYLE, fontWeight: i === selected ? '700' : '400' },
+    }, typeof tab === 'string' ? tab : String(tab?.label ?? ''))),
+  };
+}
+
+// dropdown: the menu is DOM state (uncontrolled show/hide), not React state,
+// so the wiring stays drivable from plain element trees (unit tests) and
+// identical in the browser; selecting an option dispatches
+// onChange ?? onChanged ?? onTap {value} — the reference's fallback chain.
+// exported for the interaction unit test (hook-free by design)
+export function DropdownWidget({ node, onAction }) {
+  const e = node.events ?? {};
+  const action = e.onChange ?? e.onChanged ?? e.onTap ?? null;
+  const options = node.props.options ?? [];
+  return createElement('span', { style: { position: 'relative', display: 'inline-block', width: '100%', height: '100%' } },
+    createElement('button', { type: 'button', onClick: toggleDropdownMenu, style: { width: '100%', height: '100%', ...ITEM_STYLE } },
+      String(node.props.value ?? '')),
+    createElement('span', { style: { display: 'none', position: 'absolute', background: '#fff', border: '1px solid #94a3b8', borderRadius: '4px', zIndex: 10 } },
+      options.map((o) => createElement('span', {
+        key: String(o),
+        onClick: (ev) => {
+          hideDropdownMenu(ev.currentTarget.parentElement);
+          if (onAction && action) onAction(action, { value: String(o) });
+        },
+        style: ITEM_STYLE,
+      }, String(o)))));
+}
+
+function toggleDropdownMenu(ev) {
+  const menu = ev.currentTarget.nextElementSibling;
+  if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function hideDropdownMenu(menu) {
+  if (menu) menu.style.display = 'none';
 }
 
 // Fallback card: the type name with the node id tag (Wave C common rule).
-function fallbackCard(node) {
+// String tap actions still fire from the card, the way the reference
+// delivers taps for unimplemented interactive nodes.
+function fallbackCard(node, onAction) {
   return {
+    ...wiredButton(node, onAction),
     style: {
       border: '1px dashed #64748b',
       borderRadius: '8px',

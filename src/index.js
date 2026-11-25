@@ -37,6 +37,7 @@ export function mountJsrWidget(container, options = {}) {
     widgetJs: options.widgetJs,
     theme: options.theme,
     mockOrigin: options.mockOrigin,
+    preloadSource: options.preloadSource,
   });
   let record = new Map();
   let views = 0;

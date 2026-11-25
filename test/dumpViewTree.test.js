@@ -13,7 +13,8 @@ import { normalizeTree } from '../.conformance/js_widget_runtime/harness/normali
 import { diffTree } from '../.conformance/js_widget_runtime/harness/compare.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const samples = join(here, '..', '.conformance', 'js_widget_runtime', 'docs', 'conformance', 'samples', 'flutter');
+const root = join(here, '..');
+const samples = join(root, '.conformance', 'js_widget_runtime', 'docs', 'conformance', 'samples', 'flutter');
 
 function sample(fixture) {
   return JSON.parse(readFileSync(join(samples, `${fixture}.result.json`), 'utf8'));
@@ -48,11 +49,13 @@ function styleToString(style) {
 test('the dump of each seed equals the harness-derived expected tree', () => {
   for (const fixture of ['hello', 'counter', 'scroll_list']) {
     const result = sample(fixture);
+    const meta = JSON.parse(readFileSync(join(root, '.conformance', 'js_widget_runtime', 'docs', 'conformance', 'fixtures', fixture, 'meta.json'), 'utf8'));
     const expected = normalizeTree(JSON.parse(result.renders[0]));
     const { element, record } = renderJsrTree(result.renders[0]);
     const dom = instantiate(element);
     const dump = dumpViewTree(dom, record);
-    const diffs = diffTree(expected, dump);
+    // the harness rule: compare with the fixture's meta.json.ignore applied
+    const diffs = diffTree(expected, dump, new Set(meta.ignore ?? []));
     assert.deepEqual(diffs, [], `${fixture}: ${JSON.stringify(diffs)}`);
     assert.equal(dump.nodeId, 'n0');
   }
@@ -87,4 +90,26 @@ test('live text override reads back typed input values', () => {
   const dump = dumpViewTree(dom, record);
   assert.equal(dump.props.initialValue, 'typed by user');
   assert.equal(dump.props.hint, 'hint here');
+});
+
+test('a tabBar dump carries the selected tab label as live data', () => {
+  const { element, record } = renderJsrTree({
+    type: 'tabBar', tabs: ['One', 'Two'], selectedIndex: 1,
+  });
+  const dom = instantiate(element);
+  const dump = dumpViewTree(dom, record);
+  assert.equal(dump.props.data, 'Two');
+});
+
+test('dump record colors normalize through nested objects and arrays', () => {
+  const { element, record } = renderJsrTree({
+    type: 'container',
+    color: '#1e293b',
+    style: { boxShadows: [{ color: 'rgba(0,0,0,0.5)' }], decoration: { color: '#ff0000' } },
+  });
+  const dom = instantiate(element);
+  const dump = dumpViewTree(dom, record);
+  assert.equal(dump.props.color, '#1E293B');
+  assert.equal(dump.props.boxShadows[0].color, '#00000080');
+  assert.equal(dump.props.decoration.color, '#FF0000');
 });

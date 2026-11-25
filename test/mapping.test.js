@@ -139,3 +139,173 @@ test('image maps url and alt', () => {
   const html = markupOf({ type: 'image', url: 'https://example.invalid/a.png', data: 'alt text' });
   assert.match(html, /<img[^>]*src="https:\/\/example\.invalid\/a\.png"[^>]*alt="alt text"/);
 });
+
+test('submit wiring: Enter fires onSubmit, input alone does not', () => {
+  const actions = [];
+  const { element } = renderJsrTree(
+    { type: 'textField', hint: 'F', onSubmit: 'go' },
+    { onAction: (id, p) => actions.push([id, p]) },
+  );
+  const input = findTag(element, 'input');
+  input.props.onKeyDown({ key: 'Enter', target: { value: 'typed' } });
+  assert.deepEqual(actions, [['go', { value: 'typed' }]]);
+  assert.equal(input.props.onChange, undefined);
+});
+
+test('composite nodes keep their node id on the root and expose interactive kids', () => {
+  const { element, record } = renderJsrTree(
+    { type: 'navigationBar', destinations: [{ label: 'N1' }, { label: 'N2' }], selectedIndex: 0, onSelected: 's1' },
+    { onAction: () => {} },
+  );
+  assert.equal(element.props['data-node-type'], 'navigationBar');
+  assert.equal(record.size, 1); // destinations carry no node id
+  assert.match(renderToStaticMarkup(element), />N2</);
+});
+
+test('navigationBar destinations deliver {value: index}; segments deliver {value: label}', () => {
+  const nav = [];
+  const navElement = renderJsrTree(
+    { type: 'navigationBar', destinations: [{ label: 'N1' }, { label: 'N2' }], onSelected: 's1' },
+    { onAction: (id, p) => nav.push([id, p]) },
+  ).element;
+  clickKid(navElement, 'N2');
+  assert.deepEqual(nav, [['s1', { value: 1 }]]);
+
+  const seg = [];
+  const segElement = renderJsrTree(
+    { type: 'segmentedButton', segments: ['S1', 'S2'], onSelected: 's3' },
+    { onAction: (id, p) => seg.push([id, p]) },
+  ).element;
+  clickKid(segElement, 'S2');
+  assert.deepEqual(seg, [['s3', { value: 'S2' }]]);
+});
+
+test('map surface delivers onTap {lat,lng}; markers deliver onMarkerTap {id}', () => {
+  const actions = [];
+  const { element } = renderJsrTree(
+    { type: 'map', width: 100, height: 50, markers: [{ id: 'm1', label: 'M1' }], onTap: 'mt', onMarkerTap: 'mk' },
+    { onAction: (id, p) => actions.push([id, p]) },
+  );
+  const kids = flatten(element.props.children);
+  const marker = kids.find((c) => typeof c === 'object' && c.key === 'marker-m1');
+  const surface = kids.find((c) => typeof c === 'object' && c.key === 'surface');
+  marker.props.onClick();
+  surface.props.onClick();
+  assert.deepEqual(actions, [['mk', { id: 'm1' }], ['mt', { lat: 0, lng: 0 }]]);
+});
+
+test('gestureDetector wires onScroll to wheel deltas', () => {
+  const actions = [];
+  const { element } = renderJsrTree(
+    { type: 'gestureDetector', onScroll: 'sc' },
+    { onAction: (id, p) => actions.push([id, p]) },
+  );
+  element.props.onWheel({ deltaX: 3, deltaY: 60 });
+  assert.deepEqual(actions, [['sc', { dx: 3, dy: 60 }]]);
+});
+
+test('tabBar renders labels and delivers {value: index} on tap', () => {
+  const taps = [];
+  const { element } = renderJsrTree(
+    { type: 'tabBar', tabs: ['One', 'Two'], selectedIndex: 0, onChanged: 'tb' },
+    { onAction: (id, p) => taps.push([id, p]) },
+  );
+  assert.equal(element.type, 'div');
+  const html = renderToStaticMarkup(element);
+  assert.match(html, />One</);
+  assert.match(html, />Two</);
+  const spans = flatten(element.props.children).filter((c) => typeof c === 'object' && c.type === 'span');
+  spans[1].props.onClick();
+  assert.deepEqual(taps, [['tb', { value: 1 }]]);
+});
+
+test('dropdown renders the closed opener; toggling opens and selecting dispatches', async () => {
+  const actions = [];
+  const { DropdownWidget } = await import('../src/dom/mapping.js');
+  const widget = DropdownWidget({
+    node: { events: { onTap: 'dd' }, props: { options: ['Alpha', 'Beta'], value: 'Alpha' } },
+    onAction: (id, p) => actions.push([id, p]),
+  });
+  const html = renderToStaticMarkup(widget);
+  assert.match(html, /<button[^>]*>Alpha<\/button>/);
+  // the closed menu is display:none and shows no options
+  assert.match(html, /display:none/);
+  assert.match(html, />Beta</);
+  const button = findTag(widget, 'button');
+  const menu = widget.props.children[1];
+  const option = flatten(menu.props.children).find((c) => typeof c === 'object' && c.props.children === 'Beta');
+  // opener toggles the menu; selecting hides it and dispatches {value}
+  const fakeButton = { nextElementSibling: { style: { display: 'none' } } };
+  button.props.onClick({ currentTarget: fakeButton });
+  assert.equal(fakeButton.nextElementSibling.style.display, 'block');
+  option.props.onClick({ currentTarget: { parentElement: { style: { display: 'block' } } } });
+  assert.deepEqual(actions, [['dd', { value: 'Beta' }]]);
+});
+
+test('simple mappers render their DOM shape; listTile tap and input wiring dispatch', () => {
+  const actions = [];
+  const { element } = renderJsrTree(
+    { type: 'column', children: [
+      { type: 'listView', children: [{ type: 'text', data: 'row' }] },
+      { type: 'padding', child: { type: 'card', child: { type: 'text', data: 'card' } } },
+      { type: 'spacer' },
+      { type: 'divider' },
+      { type: 'icon', icon: 'star' },
+      { type: 'video', src: 'v.mp4' },
+      { type: 'audio', src: 'a.mp3' },
+      { type: 'textArea', hint: 'area', initialValue: 'ta' },
+      { type: 'searchBar', hint: 'search' },
+      { type: 'listTile', title: 'Item', onTap: 'lt' },
+      { type: 'textField', initialValue: 'f', onChanged: 'ch', onSubmit: 'sub' },
+    ] },
+    { onAction: (id, p) => actions.push([id, p]) },
+  );
+  const html = renderToStaticMarkup(element);
+  assert.match(html, /<textarea[^>]*>ta<\/textarea>/);
+  assert.match(html, /placeholder="search"/);
+  assert.match(html, /data-node-type="listTile"/);
+  assert.match(html, /data-node-type="video"/);
+  assert.match(html, /data-node-type="audio"/);
+  const tiles = [];
+  collectByType(element, 'listTile', tiles);
+  tiles[0].props.onClick();
+  assert.deepEqual(actions[0], ['lt', {}]);
+  const inputs = [];
+  collectByType(element, 'textField', inputs);
+  inputs[0].props.onChange({ target: { value: 'abc' } });
+  inputs[0].props.onKeyDown({ key: 'Enter', target: { value: 'abc' } });
+  assert.deepEqual(actions[1], ['ch', { value: 'abc' }]);
+  assert.deepEqual(actions[2], ['sub', { value: 'abc' }]);
+});
+
+function collectByType(el, type, out) {
+  if (el.props?.['data-node-type'] === type) out.push(el);
+  for (const child of flatten(el.props?.children)) {
+    if (child && typeof child === 'object' && child.props) collectByType(child, type, out);
+  }
+}
+
+function findTag(el, tag) {
+  if (el.type === tag) return el;
+  for (const child of flatten(el.props?.children)) {
+    if (child && typeof child === 'object' && child.props) {
+      const hit = findTag(child, tag);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function clickKid(el, text) {
+  for (const child of flatten(el.props?.children)) {
+    if (child && typeof child === 'object' && child.props) {
+      const kids = child.props.children;
+      const first = Array.isArray(kids) ? kids[0] : kids;
+      if (first === text) {
+        child.props.onClick();
+        return child;
+      }
+    }
+  }
+  throw new Error(`kid with text ${text} not found`);
+}
