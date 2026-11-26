@@ -1,4 +1,4 @@
-// Generated from IstiN/js_widget_runtime@4457ff0:src/bootstrap-runtime.js by scripts/sync-bootstrap.sh — do not edit
+// Generated from IstiN/js_widget_runtime@6215bb5:src/bootstrap-runtime.js by scripts/sync-bootstrap.sh — do not edit
 // Generated from IstiN/flutter_js_widget_runtime@25c1bb975e30d458fb8ea0e99be80308453436d0:lib/src/runtime/js_widget_bootstrap.dart (runtime half) by scripts/extract_bootstrap.mjs — do not edit.
 var __cbs = {};
 var __iv_cbs = {};
