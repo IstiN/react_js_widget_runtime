@@ -248,12 +248,64 @@ function flexCss(node, direction) {
 
 // ---------- node mappers (one per type family) ----------
 
+// A3: the reference swipe is a touch drag — the finger moves the list 1:1
+// and the release flings with the gesture's velocity (ListView fling
+// physics). The web equivalent on the mapped overflow container: pointer
+// drag scrolls live; pointerup starts a decaying fling driven by rAF;
+// scrollTop clamps at both ends. Taps (down/up without movement) never
+// fling, so buttons inside the container are unaffected.
+function trackDrag(drag, el, e) {
+  const dy = drag.y - e.clientY;
+  el.scrollTop = drag.top + dy;
+  const dt = Math.max(1, e.timeStamp - drag.t);
+  drag.v = 0.8 * drag.v + 0.2 * (dy / dt);
+  drag.y = e.clientY;
+  drag.top = el.scrollTop;
+  drag.t = e.timeStamp;
+  return drag;
+}
+
+function startFling(el, v, scheduleFrame) {
+  const step = () => {
+    el.scrollTop += v * 16;
+    v *= 0.95;
+    if (Math.abs(v) > 0.05) scheduleFrame(step);
+  };
+  if (Math.abs(v) > 0.05) scheduleFrame(step);
+}
+
+function releaseDrag(el, drag, scheduleFrame) {
+  const v = Math.abs(drag.v) > 0.05 ? drag.v : 0;
+  if (v) startFling(el, v, scheduleFrame);
+}
+
+function flingScroll(el) {
+  if (!el) return;
+  let drag = null;
+  const move = (e) => {
+    if (drag && e.pointerId === drag.id) drag = trackDrag(drag, el, e);
+  };
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    releaseDrag(el, drag, requestAnimationFrame);
+    drag = null;
+    window.removeEventListener('pointermove', move);
+  };
+  el.addEventListener('pointerdown', (e) => {
+    if (drag) return;
+    drag = { id: e.pointerId, y: e.clientY, top: el.scrollTop, t: e.timeStamp, v: 0 };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end, { once: true });
+    window.addEventListener('pointercancel', end, { once: true });
+  });
+}
+
 const MAPPERS = {
   center: (node) => ({ style: { display: 'flex', alignItems: 'center', justifyContent: 'center', ...boxCss(node) } }),
   column: (node) => ({ style: flexCss(node, 'column') }),
   row: (node) => ({ style: flexCss(node, 'row') }),
   text: (node) => ({ style: { ...boxCss(node), whiteSpace: 'pre-wrap' } }),
-  scroll: (node) => ({ style: { overflowY: 'auto', ...boxCss(node) } }),
+  scroll: (node) => ({ style: { overflowY: 'auto', ...boxCss(node) }, ref: flingScroll }),
   listView: (node) => ({ style: { overflowY: 'auto', display: 'flex', flexDirection: 'column', ...boxCss(node) } }),
   padding: (node) => ({ style: { boxSizing: 'border-box', ...boxCss(node) } }),
   container: (node) => ({ style: boxCss(node) }),
@@ -514,7 +566,7 @@ export const SPECS = {
   column: { dom: '<div> flex column', css: FLEX_CSS.replace('spacing', 'flex-direction:column; spacing') },
   row: { dom: '<div> flex row', css: FLEX_CSS.replace('spacing', 'flex-direction:row; spacing') },
   text: { dom: '<span> text child (data, textTransform applied)', css: 'white-space:pre-wrap; fontSize→font-size; color→color; fontWeight→font-weight; textAlign→text-align; textShadow(s)→text-shadow; box props' },
-  scroll: { dom: '<div> scroll container', css: 'overflow-y:auto; box props' },
+  scroll: { dom: '<div> scroll container (pointer drag scrolls, release flings)', css: 'overflow-y:auto; box props; A3 dump: scrollOffset/scrollExtent/viewportExtent' },
   listView: { dom: '<div> flex column scroll', css: 'display:flex; flex-direction:column; spacing→gap; overflow-y:auto; box props' },
   padding: { dom: '<div> padded box', css: 'box-sizing:border-box; padding→padding; box props' },
   container: { dom: '<div> box', ...BOX },

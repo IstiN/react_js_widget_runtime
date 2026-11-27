@@ -2,6 +2,7 @@
 // view layer. The widget runs in a Worker (browser) with the two canonical
 // bootstrap halves; this thread renders `jsr.render` payloads and drives
 // timers, rAF and host services.
+import { cloneElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createWorkerEngine } from './engine/WorkerEngine.js';
 import { createHostBridge } from './host/hostServices.js';
@@ -59,7 +60,13 @@ export function mountJsrWidget(container, options = {}) {
     views++;
     const applied = renderJsrTree(bridge.renders[bridge.renders.length - 1], { onAction });
     record = applied.record;
-    root.render(applied.element);
+    // The reference render root receives the host's tight constraints (the
+    // widget fills the surface), so scrollables size their viewport against
+    // the surface, not the content; an explicit root size still wins.
+    const rootEl = applied.element;
+    root.render(cloneElement(rootEl, {
+      style: { width: '100%', height: '100%', ...rootEl.props.style },
+    }));
   }
 
   return {

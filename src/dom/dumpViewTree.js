@@ -7,7 +7,7 @@
 // defaults) plus the normalized node for type/events/children. Output is
 // comparable by `jsr-harness compare`; color values go through the one
 // normalization.
-import { normalizeColor } from '../../.conformance/js_widget_runtime/harness/normalize.mjs';
+import { normalizeColor, isScrollableType } from '../../.conformance/js_widget_runtime/harness/normalize.mjs';
 
 // Types whose label is live DOM text (the reference dump reads Text.data /
 // button labels live and keeps both data and text on buttons).
@@ -63,7 +63,18 @@ function liveProps(el, applied) {
   else if (isFormType(type)) liveInputProps(props, el);
   else if (type === 'popupMenu') props.message = props.message ?? 'Show menu';
   else if (type === 'tabBar') props.data = selectedTab(props);
+  else if (isScrollableType(type)) scrollState(props, el);
   return props;
+}
+
+// A3: every scrollable node dumps its live scroll state — offset, full
+// content extent and viewport extent, logical px on the primary axis
+// (DOM: scrollTop / scrollHeight / clientHeight). Both dumps carry it;
+// the comparator validates presence and derives `scrolledToEnd` from it.
+function scrollState(props, el) {
+  props.scrollOffset = el.scrollTop ?? 0;
+  props.scrollExtent = el.scrollHeight ?? 0;
+  props.viewportExtent = el.clientHeight ?? 0;
 }
 
 // The applied-node record the way the reference dump pipeline keeps it:

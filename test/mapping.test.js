@@ -309,3 +309,38 @@ function clickKid(el, text) {
   }
   throw new Error(`kid with text ${text} not found`);
 }
+
+test('A3 fling: pointer drag scrolls 1:1 and the release fling decays', () => {
+  const element = renderJsrTree({ type: 'scroll', children: [{ type: 'text', data: 'x' }] }).element;
+  const listeners = {};
+  const el = {
+    scrollTop: 100,
+    addEventListener: (name, fn) => { listeners[name] = fn; },
+  };
+  const win = { addEventListener: (name, fn) => { listeners['win:' + name] = fn; }, removeEventListener() {} };
+  const frames = [];
+  const realWindow = globalThis.window;
+  const realRaf = globalThis.requestAnimationFrame;
+  globalThis.window = win;
+  globalThis.requestAnimationFrame = (fn) => frames.push(fn);
+  try {
+    element.props.ref(el);
+    listeners.pointerdown({ pointerId: 1, clientY: 200, timeStamp: 0 });
+    listeners['win:pointermove']({ pointerId: 1, clientY: 130, timeStamp: 1 });
+    assert.equal(el.scrollTop, 170, 'the finger moves the container 1:1');
+    listeners['win:pointermove']({ pointerId: 1, clientY: 60, timeStamp: 2 });
+    assert.equal(el.scrollTop, 240);
+    listeners['win:pointerup']({ pointerId: 1 });
+    assert.equal(frames.length, 1, 'release with velocity schedules the fling');
+    let steps = 0;
+    while (frames.length && steps < 500) { frames.shift()(); steps++; }
+    assert.ok(el.scrollTop > 240 + 100, `the fling carried beyond the finger: ${el.scrollTop}`);
+    assert.equal(frames.length, 0, 'the fling decays to a stop');
+    listeners.pointerdown({ pointerId: 2, clientY: 10, timeStamp: 100 });
+    listeners['win:pointerup']({ pointerId: 2 });
+    assert.equal(frames.length, 0, 'a tap (no movement) never flings');
+  } finally {
+    globalThis.window = realWindow;
+    globalThis.requestAnimationFrame = realRaf;
+  }
+});
