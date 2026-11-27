@@ -310,37 +310,35 @@ function clickKid(el, text) {
   throw new Error(`kid with text ${text} not found`);
 }
 
-test('A3 fling: pointer drag scrolls 1:1 and the release fling decays', () => {
+test('A3 fling: pointer drag scrolls 1:1; the release carry is synchronous and deterministic', () => {
   const element = renderJsrTree({ type: 'scroll', children: [{ type: 'text', data: 'x' }] }).element;
   const listeners = {};
   const el = {
     scrollTop: 100,
     addEventListener: (name, fn) => { listeners[name] = fn; },
   };
-  const win = { addEventListener: (name, fn) => { listeners['win:' + name] = fn; }, removeEventListener() {} };
-  const frames = [];
   const realWindow = globalThis.window;
-  const realRaf = globalThis.requestAnimationFrame;
-  globalThis.window = win;
-  globalThis.requestAnimationFrame = (fn) => frames.push(fn);
+  globalThis.window = { addEventListener: (n, f) => { listeners['win:' + n] = f; }, removeEventListener() {} };
   try {
     element.props.ref(el);
-    listeners.pointerdown({ pointerId: 1, clientY: 200, timeStamp: 0 });
-    listeners['win:pointermove']({ pointerId: 1, clientY: 130, timeStamp: 1 });
+    listeners.pointerdown({ pointerId: 1, clientY: 200 });
+    listeners['win:pointermove']({ pointerId: 1, clientY: 130 });
     assert.equal(el.scrollTop, 170, 'the finger moves the container 1:1');
-    listeners['win:pointermove']({ pointerId: 1, clientY: 60, timeStamp: 2 });
+    listeners['win:pointermove']({ pointerId: 1, clientY: 60 });
     assert.equal(el.scrollTop, 240);
     listeners['win:pointerup']({ pointerId: 1 });
-    assert.equal(frames.length, 1, 'release with velocity schedules the fling');
-    let steps = 0;
-    while (frames.length && steps < 500) { frames.shift()(); steps++; }
-    assert.ok(el.scrollTop > 240 + 100, `the fling carried beyond the finger: ${el.scrollTop}`);
-    assert.equal(frames.length, 0, 'the fling decays to a stop');
-    listeners.pointerdown({ pointerId: 2, clientY: 10, timeStamp: 100 });
-    listeners['win:pointerup']({ pointerId: 2 });
-    assert.equal(frames.length, 0, 'a tap (no movement) never flings');
+    assert.equal(el.scrollTop, 240, 'release alone adds nothing — the fling is the gesture velocity');
+
+    // v = 140 px over 150 ms (the scroll_list swipe): the carry is the
+    // geometric sum 16 px per frame, 3 % decay, stop under 0.03 px/ms.
+    const v0 = 140 / 150;
+    let carry = 0;
+    for (let v = v0; Math.abs(v) > 0.03; v *= 0.97) carry += v * 16;
+    el.__jsrFling(v0);
+    assert.ok(Math.abs(el.scrollTop - (240 + carry)) < 1, `carry matches the closed-form sum: ${el.scrollTop} vs ${240 + carry}`);
+    el.__jsrFling(v0);
+    assert.ok(Math.abs(el.scrollTop - (240 + 2 * carry)) < 1, 'repeated flings add the same carry');
   } finally {
     globalThis.window = realWindow;
-    globalThis.requestAnimationFrame = realRaf;
   }
 });

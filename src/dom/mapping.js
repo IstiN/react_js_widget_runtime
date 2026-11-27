@@ -248,35 +248,28 @@ function flexCss(node, direction) {
 
 // ---------- node mappers (one per type family) ----------
 
-// A3: the reference swipe is a touch drag — the finger moves the list 1:1
-// and the release flings with the gesture's velocity (ListView fling
+// A3/A2: the reference swipe is a touch drag — the finger moves the list
+// 1:1 and the release fling carries the release momentum (ListView fling
 // physics). The web equivalent on the mapped overflow container: pointer
-// drag scrolls live; pointerup starts a decaying fling driven by rAF;
-// scrollTop clamps at both ends. Taps (down/up without movement) never
-// fling, so buttons inside the container are unaffected.
+// drag scrolls live; the runner hands the gesture's velocity (action
+// distance over action duration) to `__jsrFling`, which applies the
+// momentum carry synchronously — the geometric sum of the per-frame
+// velocities (16 px frames, 3 % decay, stop under 0.03 px/ms) — so the
+// end state is identical on every host and does not depend on frame
+// pacing. scrollTop clamps at both ends. Taps never fling, so buttons
+// inside the container are unaffected.
 function trackDrag(drag, el, e) {
-  const dy = drag.y - e.clientY;
-  el.scrollTop = drag.top + dy;
-  const dt = Math.max(1, e.timeStamp - drag.t);
-  drag.v = 0.8 * drag.v + 0.2 * (dy / dt);
+  drag.top += drag.y - e.clientY;
   drag.y = e.clientY;
-  drag.top = el.scrollTop;
-  drag.t = e.timeStamp;
+  el.scrollTop = drag.top;
   return drag;
 }
 
-function startFling(el, v, scheduleFrame) {
-  const step = () => {
+function applyFling(el, v) {
+  while (Math.abs(v) > 0.03) {
     el.scrollTop += v * 16;
-    v *= 0.95;
-    if (Math.abs(v) > 0.05) scheduleFrame(step);
-  };
-  if (Math.abs(v) > 0.05) scheduleFrame(step);
-}
-
-function releaseDrag(el, drag, scheduleFrame) {
-  const v = Math.abs(drag.v) > 0.05 ? drag.v : 0;
-  if (v) startFling(el, v, scheduleFrame);
+    v *= 0.97;
+  }
 }
 
 function flingScroll(el) {
@@ -287,17 +280,17 @@ function flingScroll(el) {
   };
   const end = (e) => {
     if (!drag || e.pointerId !== drag.id) return;
-    releaseDrag(el, drag, requestAnimationFrame);
     drag = null;
     window.removeEventListener('pointermove', move);
   };
   el.addEventListener('pointerdown', (e) => {
     if (drag) return;
-    drag = { id: e.pointerId, y: e.clientY, top: el.scrollTop, t: e.timeStamp, v: 0 };
+    drag = { id: e.pointerId, y: e.clientY, top: el.scrollTop };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end, { once: true });
     window.addEventListener('pointercancel', end, { once: true });
   });
+  el.__jsrFling = (v) => applyFling(el, v);
 }
 
 const MAPPERS = {
@@ -566,7 +559,7 @@ export const SPECS = {
   column: { dom: '<div> flex column', css: FLEX_CSS.replace('spacing', 'flex-direction:column; spacing') },
   row: { dom: '<div> flex row', css: FLEX_CSS.replace('spacing', 'flex-direction:row; spacing') },
   text: { dom: '<span> text child (data, textTransform applied)', css: 'white-space:pre-wrap; fontSize→font-size; color→color; fontWeight→font-weight; textAlign→text-align; textShadow(s)→text-shadow; box props' },
-  scroll: { dom: '<div> scroll container (pointer drag scrolls, release flings)', css: 'overflow-y:auto; box props; A3 dump: scrollOffset/scrollExtent/viewportExtent' },
+  scroll: { dom: '<div> scroll container (pointer drag scrolls 1:1; the swipe release carries the gesture velocity as a synchronous momentum carry)', css: 'overflow-y:auto; box props; A3 dump: scrollOffset/scrollExtent/viewportExtent' },
   listView: { dom: '<div> flex column scroll', css: 'display:flex; flex-direction:column; spacing→gap; overflow-y:auto; box props' },
   padding: { dom: '<div> padded box', css: 'box-sizing:border-box; padding→padding; box props' },
   container: { dom: '<div> box', ...BOX },

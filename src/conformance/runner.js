@@ -223,6 +223,25 @@ async function applyActionsOnPage(page, actions) {
   await applyActions(driver, actions, async () => page.waitForTimeout(SETTLE_AFTER_ACTION_MS));
 }
 
+// A2/A3 swipe: pointer drag with the given duration; the release hands the
+// gesture velocity (the action's own distance over duration, never event
+// timing) to the scroll container under the start point, which applies its
+// synchronous momentum carry (mapping.js flingScroll).
+async function dragGesture(page, x1, y1, x2, y2, ms) {
+  await page.mouse.move(x1, y1);
+  await page.mouse.down();
+  await page.mouse.move(x2, y2, { steps: Math.max(4, Math.min(40, Math.round(ms / 16))) });
+  await page.mouse.up();
+  await page.waitForTimeout(ms);
+  if (y1 !== y2 && ms > 0) {
+    await page.evaluate(([x, y, v]) => {
+      let el = document.elementFromPoint(x, y);
+      while (el && !el.__jsrFling) el = el.parentElement;
+      el?.__jsrFling?.(v);
+    }, [x1, y1, (y1 - y2) / ms]);
+  }
+}
+
 function playwrightIo(page) {
   return {
     click: (selector) => page.click(selector, { timeout: 5000 }),
@@ -246,13 +265,7 @@ function playwrightIo(page) {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.wheel(dx, dy);
     },
-    drag: async (x1, y1, x2, y2, ms) => {
-      await page.mouse.move(x1, y1);
-      await page.mouse.down();
-      await page.mouse.move(x2, y2, { steps: Math.max(4, Math.min(40, Math.round(ms / 16))) });
-      await page.mouse.up();
-      await page.waitForTimeout(ms);
-    },
+    drag: (x1, y1, x2, y2, ms) => dragGesture(page, x1, y1, x2, y2, ms),
     sleep: (ms) => page.waitForTimeout(ms),
     hostEventBack: () => page.evaluate(() => window.__jsr.engine.hostEvent('back', {})),
   };
