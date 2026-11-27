@@ -1,5 +1,5 @@
-// Generated from IstiN/js_widget_runtime@68e149d:src/bootstrap-widget.js by scripts/sync-bootstrap.sh — do not edit
-// Generated from IstiN/flutter_js_widget_runtime@e136d47:lib/src/runtime/js_widget_bootstrap.dart (widget half) by scripts/extract_bootstrap.mjs — do not edit
+// Generated from IstiN/js_widget_runtime@ca6dd7f:src/bootstrap-widget.js by scripts/sync-bootstrap.sh — do not edit
+// Generated from IstiN/flutter_js_widget_runtime@135ac6b:lib/src/runtime/js_widget_bootstrap.dart (widget half) by scripts/extract_bootstrap.mjs — do not edit
 Object.assign(jsr, {
 ease: {
     linear: function(t){ return t; },
