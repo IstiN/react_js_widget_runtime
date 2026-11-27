@@ -79,14 +79,14 @@ const HANDLERS = {
     if (!p || typeof p.id !== 'string') return;
     const once = Boolean(p.once);
     const ms = intervalMsOf(p, once);
-    ctx.schedule(p.id, ms, () => ctx.engine.intervalTick(p.id), !once);
+    ctx.schedule(p.id, ms, () => ctx.engine.intervalTick(p.id), once ? 'once' : 'interval');
   },
   __jsr_clear_interval: cancelTimer,
   __jsr_caf: cancelTimer,
   __jsr_raf: (ctx, payload) => {
     const p = parseTagged(payload);
     if (!p || typeof p.id !== 'string') return;
-    ctx.schedule(p.id, 0, () => ctx.engine.rafTick(p.id, Date.now() - ctx.startedAt), false);
+    ctx.schedule(p.id, 0, () => ctx.engine.rafTick(p.id, Date.now() - ctx.startedAt), 'raf');
   },
   __jsr_fetch: (ctx, payload) => {
     const p = parseTagged(payload);
@@ -202,19 +202,19 @@ export function createHostBridge(engine, opts = {}) {
     schedule,
   };
 
-  // rAF when the host has it (browser), setTimeout fallback for the
-  // non-browser main thread; once timers fire once, intervals repeat.
-  function schedule(id, ms, tick, repeat) {
-    const raf = globalThis.requestAnimationFrame;
+  // The timer kind decides the mechanism: only __jsr_raf rides the
+  // animation frame; a once-interval honors its delay via setTimeout and a
+  // repeat uses setInterval. Hosts without rAF (Node) fall back to setTimeout.
+  function schedule(id, ms, tick, kind) {
     let cancel;
-    if (raf && !repeat) {
-      const rafId = raf(() => {
+    if (kind === 'raf' && globalThis.requestAnimationFrame) {
+      const rafId = globalThis.requestAnimationFrame(() => {
         if (!timers.has(id)) return;
         timers.delete(id);
         tick();
       });
       cancel = () => globalThis.cancelAnimationFrame(rafId);
-    } else if (repeat) {
+    } else if (kind === 'interval') {
       const t = setInterval(tick, ms);
       cancel = () => clearInterval(t);
     } else {

@@ -136,6 +136,35 @@ test('interval repeats on the main thread; once fires exactly one tick; clear ca
   assert.equal(i1AfterClear, i1Ticks);
 });
 
+test('browser-like host: once-intervals honor ms; only rAF rides the frame', async (t) => {
+  // Regression: schedule() used to branch on repeat, so every widget
+  // setTimeout took the rAF branch and fired after one frame, ignoring ms.
+  // The fake global rAF below is what made that invisible in Node.
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const frames = [];
+  globalThis.requestAnimationFrame = (cb) => { frames.push(cb); return frames.length; };
+  globalThis.cancelAnimationFrame = (rafId) => { frames[rafId - 1] = null; };
+  try {
+    const { engine, send } = makeBridge();
+    send('__jsr_set_interval', JSON.stringify({ iid: 'x', id: 'slow', ms: 5000, once: true }));
+    send('__jsr_set_interval', JSON.stringify({ iid: 'x', id: 'rep', ms: 30 }));
+    send('__jsr_raf', JSON.stringify({ iid: 'x', id: 'frame' }));
+    assert.equal(frames.length, 1, 'only the __jsr_raf request rides the animation frame');
+
+    for (const cb of frames.splice(0)) cb(16); // the first animation frame fires
+    t.mock.timers.tick(40); // one interval period; far below the 5000 ms delay
+    assert.deepEqual(engine.ticks, ['frame', 'rep'], 'the frame rode rAF; the 5000 ms once-timer must not fire early');
+
+    t.mock.timers.tick(5000);
+    assert.ok(engine.ticks.includes('slow'), `once-interval must fire after its delay: ${engine.ticks}`);
+    assert.ok(engine.ticks.filter((id) => id === 'rep').length > 1, `repeat honors its period: ${engine.ticks}`);
+    assert.equal(engine.ticks.filter((id) => id === 'slow').length, 1, 'a once-interval fires exactly once');
+  } finally {
+    delete globalThis.requestAnimationFrame;
+    delete globalThis.cancelAnimationFrame;
+  }
+});
+
 test('trace records verbs and unsupported promise channels do not resolve without id', async () => {
   const { bridge, engine, send } = makeBridge();
   send('__jsr_render', '{"type":"text","data":"x"}');
