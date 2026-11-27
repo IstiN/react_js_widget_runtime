@@ -1,0 +1,324 @@
+{
+  "generatedFrom": "src/dom/mapping.js + docs/contract/nodes",
+  "nodes": {
+    "absoluteFill": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "adaptive": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "align": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "animatedContainer": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "animatedOpacity": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "animatedPositioned": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "animatedSwitcher": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "appBar": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "aspectRatio": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "audio": {
+      "status": "yes"
+    },
+    "audio_player": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "badge": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "banner": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "blur": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "bottomAppBar": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "bottomSheet": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "button": {
+      "status": "yes"
+    },
+    "card": {
+      "status": "yes"
+    },
+    "carousel": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "center": {
+      "status": "yes"
+    },
+    "chart": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "checkbox": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "chip": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "circle": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "circleAvatar": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "circularProgressIndicator": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "clipRRect": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "column": {
+      "status": "yes"
+    },
+    "container": {
+      "status": "yes"
+    },
+    "datePicker": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "dialog": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "divider": {
+      "status": "yes"
+    },
+    "drawer": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "dropdown": {
+      "status": "yes"
+    },
+    "entrance": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "expanded": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "fab": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "fill": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "flChart": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "flexible": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "gestureDetector": {
+      "status": "yes"
+    },
+    "gridView": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "icon": {
+      "status": "yes"
+    },
+    "iconButton": {
+      "status": "yes"
+    },
+    "image": {
+      "status": "yes"
+    },
+    "inkWell": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "line": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "linearProgressIndicator": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "listTile": {
+      "status": "yes"
+    },
+    "listView": {
+      "status": "yes"
+    },
+    "map": {
+      "status": "partial",
+      "reason": "host contract",
+      "note": "stub surface; taps and markers work, real content needs a host"
+    },
+    "markdown": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "navigationBar": {
+      "status": "yes"
+    },
+    "navigationRail": {
+      "status": "yes"
+    },
+    "opacity": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "outlinedButton": {
+      "status": "yes"
+    },
+    "padding": {
+      "status": "yes"
+    },
+    "path": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "polygon": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "popupMenu": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "radio": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "rect": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "row": {
+      "status": "yes"
+    },
+    "safeArea": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "scene3d": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "scroll": {
+      "status": "yes"
+    },
+    "searchBar": {
+      "status": "yes"
+    },
+    "segmentedButton": {
+      "status": "yes"
+    },
+    "sizedBox": {
+      "status": "yes"
+    },
+    "slider": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "snackBar": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "spacer": {
+      "status": "yes"
+    },
+    "stack": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "svg": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "switch": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "tabBar": {
+      "status": "yes"
+    },
+    "text": {
+      "status": "yes"
+    },
+    "textArea": {
+      "status": "yes"
+    },
+    "textButton": {
+      "status": "yes"
+    },
+    "textField": {
+      "status": "yes"
+    },
+    "three": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "timePicker": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "tooltip": {
+      "status": "partial",
+      "reason": "fallback"
+    },
+    "video": {
+      "status": "yes"
+    },
+    "voxel": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "webView": {
+      "status": "partial",
+      "reason": "host contract"
+    },
+    "wrap": {
+      "status": "partial",
+      "reason": "fallback"
+    }
+  }
+}

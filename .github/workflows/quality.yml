@@ -1,0 +1,61 @@
+name: Quality
+on: [push, pull_request]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: bash scripts/fetch-conformance.sh
+      - run: bash scripts/sync-bootstrap.sh && git diff --exit-code
+      - name: Install the chromium browser (browser test feeds the CRAP coverage)
+        run: npx playwright install chromium
+      - run: npm run build
+      - run: npm test
+      - run: npm run coverage
+      - name: Coverage file is present and non-empty
+        run: test -s coverage/coverage-final.json
+      - run: npm run crap
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: bash scripts/fetch-conformance.sh
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: node tool/conformance.mjs --fixtures .conformance/js_widget_runtime/docs/conformance/fixtures --out out/conformance
+      - name: Count guard — one result per fixture
+        run: |
+          fixtures=$(ls -d .conformance/js_widget_runtime/docs/conformance/fixtures/*/ | wc -l)
+          results=$(ls out/conformance/*.result.json | wc -l)
+          echo "fixtures=$fixtures results=$results"
+          [ "$results" -ge "$fixtures" ]
+      - name: Harness compare (exit 2 = fixture failures, kept visible in the report)
+        run: |
+          code=0
+          node .conformance/js_widget_runtime/harness/harness.mjs compare \
+            --fixtures .conformance/js_widget_runtime/docs/conformance/fixtures \
+            --results out/conformance \
+            --out-report conformance-report.md || code=$?
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit "$code"; fi
+          tail -1 conformance-report.md
+      - name: The three seeds must PASS
+        run: |
+          for seed in hello counter scroll_list; do
+            grep -q "^| $seed | .* | PASS |" conformance-report.md || { echo "seed $seed is not PASS"; exit 1; }
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: conformance-web
+          path: |
+            conformance-report.md
+            out/conformance
